@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Ma bulle de recommandation - Nettoyage des données</title>
+  <style>
+    body { margin: 0; padding: 0; font-family: Verdana, sans-serif;
+      background: linear-gradient(to bottom, #5bc0eb, #20639b);
+      height: 100vh; overflow: hidden; position: relative;
+      opacity: 0; animation: fadeIn 0.5s ease forwards; }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .fade-out { animation: fadeOut 0.5s ease forwards; }
+
+    .container { padding: 2rem; box-sizing: border-box;
+      height: 100%; position: relative; z-index: 1; }
+    .panel { background: rgba(255,255,255,0.1);
+      border-radius: 8px; padding: 1rem;
+      color: #fff; overflow-y: auto;
+      height: calc(100% - 2rem); }
+
+    h2 { margin-top: 0; font-size: 1.5rem; }
+    table { width: 100%; border-collapse: collapse; margin-top: 1rem; }
+    th, td { border: 1px solid rgba(255,255,255,0.3);
+      padding: 0.5rem; text-align: left; }
+    th { background: rgba(255,255,255,0.2); }
+    .clean-btn { background: rgba(255,255,255,0.2);
+      border: none; padding: 0.3rem 0.6rem; border-radius: 4px;
+      color: #fff; cursor: pointer; transition: background 0.2s; }
+    .clean-btn:hover { background: rgba(255,255,255,0.3); }
+
+    @keyframes fadeOutRow { from { opacity: 1; height: auto; }
+      to { opacity: 0; height: 0; padding: 0; margin: 0; } }
+    .fade-out-row { animation: fadeOutRow 0.5s ease forwards; }
+
+    .nav-bubble { position: absolute; top: 1rem;
+      width: 30px; height: 30px; background: rgba(255,255,255,0.2);
+      border-radius: 50%; display: flex; align-items: center;
+      justify-content: center; cursor: pointer;
+      backdrop-filter: blur(6px); transition: background 0.2s;
+      z-index: 2; color: #fff; font-size: 1rem; }
+    .nav-bubble:hover { background: rgba(255,255,255,0.3); }
+    .nav-left { right: 70px; }
+    .nav-right { right: 20px; }
+
+    .bubble-floating { position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      animation: floatUp 30s linear infinite;
+      pointer-events: none; backdrop-filter: blur(8px);
+      z-index: 0; }
+    @keyframes floatUp { 0% { bottom: -100px; transform: translateX(0);} 
+      100% { bottom: 110%; transform: translateX(50px);} }
+  </style>
+</head>
+<body>
+  <!-- Navigation -->
+  <div class="nav-bubble nav-left" onclick="navigate('page1.html')">◀</div>
+  <div class="nav-bubble nav-right" onclick="navigate('page3.html')">▶</div>
+
+  <div class="container">
+    <div class="panel">
+      <h2>Données (supprimez les lignes absurdes)</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Âge</th>
+            <th>Vidéo vue</th>
+            <th>Catégorie</th>
+            <th>Vidéo suivante</th>
+            <th>Vues</th>
+            <th>J'aime</th>
+            <th>Commentaires</th>
+            <th>Publiée il y a (jours)</th>
+            <th>Action</th>
+          </tr>
+        </thead>
+        <tbody id="data-body">
+          <tr><td>12</td><td>Survie extrême : ma base secrète révélée</td><td>Jeux</td><td>Top des nouveautés ludiques</td><td>20000</td><td>0.85</td><td>300</td><td>2</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>300</td><td>24h sans électricité : comment j’ai survécu</td><td>Survie</td><td>Survie extrême</td><td>-1000</td><td>0.5</td><td>100</td><td>5</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>-5</td><td>Je teste la recette du gâteau arc-en-ciel</td><td>Cuisine</td><td>Pâtisserie futuriste</td><td>50000</td><td>1.1</td><td>1000</td><td>1</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>14</td><td>Haul : mes tenues préférées pour l’été</td><td>Mode</td><td>Haul mode</td><td>8000</td><td>0.75</td><td>-20</td><td>4</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>8</td><td>Comment brosser son chat sans stress</td><td>Animaux</td><td>Tutoriel animaux</td><td>15000</td><td>0.9</td><td>500</td><td>-3</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>42</td><td>Vlog découverte : un marché nocturne</td><td>Mystère</td><td>Documentaire mystère</td><td>0</td><td>0.2</td><td>5</td><td>10</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>0</td><td>Je teste 3 applis de productivité</td><td>Science</td><td>Exploration spatiale</td><td>40000</td><td>0.95</td><td>2000</td><td>100</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>150</td><td>Ma routine du matin pour être efficace</td><td>Science</td><td>Chrono-science</td><td>100</td><td>0</td><td>0</td><td>0</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>13</td><td>Je construis une cabane dans mon jardin</td><td>DIY</td><td>DIY nature</td><td>90000</td><td>0.6</td><td>10000</td><td>365</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>11</td><td>Top 5 des films que j’ai vus cet été</td><td>Humour</td><td>Divertissement</td><td>300000</td><td>0.98</td><td>4000</td><td>0</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>9</td><td>Recette du meilleur smoothie fraise-banane</td><td>Cuisine</td><td>Cuisine alternative</td><td>450</td><td>-0.1</td><td>30</td><td>1</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>85</td><td>10 astuces pour mieux dormir</td><td>Psychologie</td><td>Psychologie</td><td>12345</td><td>0.8</td><td>600</td><td>7</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>16</td><td>Unboxing de vêtements vintage</td><td>Paranormal</td><td>Paranormal</td><td>800</td><td>0.3</td><td>70</td><td>0</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>-1</td><td>Je fabrique un terrarium maison</td><td>Bizarre</td><td>Thriller psychologique</td><td>250000</td><td>0.77</td><td>15000</td><td>2</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>20</td><td>DIY : fabriquer un carnet personnalisé</td><td>DIY</td><td>Sport urbain</td><td>50</td><td>0.5</td><td>1</td><td>400</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<!-- Extra rows to double data size -->
+<tr><td>10</td><td>Top 10 des jeux vidéo rétro</td><td>Jeux</td><td>Découverte rétro</td><td>15000</td><td>0.65</td><td>500</td><td>30</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>28</td><td>Recette facile de cookies moelleux</td><td>Cuisine</td><td>Recette express</td><td>4000</td><td>0.4</td><td>180</td><td>12</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>14</td><td>Défi 100 pompes en une journée</td><td>Sport</td><td>Fitness maison</td><td>22000</td><td>0.72</td><td>640</td><td>18</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>7</td><td>Mon chat rencontre un chien pour la première fois</td><td>Animaux</td><td>Animaux mignons</td><td>98000</td><td>0.9</td><td>1200</td><td>5</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>19</td><td>Haul : mes tenues préférées pour l’été</td><td>Mode</td><td>Lookbook été</td><td>7500</td><td>0.55</td><td>230</td><td>14</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>33</td><td>Un jour à Paris : vlog découverte</td><td>Vlog</td><td>Voyage urbain</td><td>120000</td><td>0.87</td><td>4500</td><td>3</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>12</td><td>Je construis une cabane dans mon jardin</td><td>DIY</td><td>Nature & bricolage</td><td>60000</td><td>0.48</td><td>900</td><td>40</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>15</td><td>Défi sport : 200 sauts à la corde</td><td>Sport</td><td>Cardio flash</td><td>32000</td><td>0.61</td><td>700</td><td>20</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>22</td><td>Smoothie tropical ultra frais</td><td>Cuisine</td><td>Santé</td><td>5400</td><td>0.52</td><td>210</td><td>16</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>9</td><td>Je dessine mes personnages préférés</td><td>Dessins</td><td>Art à la maison</td><td>2700</td><td>0.35</td><td>95</td><td>25</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>41</td><td>24h sans téléphone : expérience</td><td>Vlog</td><td>Détox numérique</td><td>18000</td><td>0.6</td><td>400</td><td>9</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>17</td><td>Top 10 des jeux de société en famille</td><td>Jeux</td><td>Soirée en famille</td><td>8200</td><td>0.44</td><td>260</td><td>60</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>30</td><td>Je teste 3 applis de productivité</td><td>Tech</td><td>Productivité</td><td>55000</td><td>0.57</td><td>1400</td><td>11</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>13</td><td>Escape game maison : je réussis ou pas ?</td><td>Jeux</td><td>Énigmes</td><td>26000</td><td>0.62</td><td>480</td><td>7</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+<tr><td>18</td><td>Mes astuces pour réviser plus vite</td><td>Vlog</td><td>Études</td><td>4000</td><td>0.38</td><td>120</td><td>90</td><td><button class="clean-btn" onclick="removeRow(this)">✖</button></td></tr>
+
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Background bubbles -->
+  <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s;"></div>
+  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s;"></div>
+  <div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s;"></div>
+  <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s;"></div>
+  <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s;"></div>
+
+  <script>
+    function navigate(url) {
+      document.body.classList.add('fade-out');
+      document.body.addEventListener('animationend', () => window.location.href = url, { once: true });
+    }
+
+    const STORAGE_KEY = 'studentDataV2';
+    function normalizeSample(s, source='page2') {
+      if (!s) return null;
+      const title = (s.title || s.watched || '').trim();
+      const label = (s.label || s.category || '').trim();
+      if (!title || !label) return null;
+      return { title, label, source };
+    }
+    function loadSamples() {
+      try {
+        const raw = JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
+        return Array.isArray(raw) ? raw.map(n => normalizeSample(n, n.source)).filter(Boolean) : [];
+      } catch (e) { return []; }
+    }
+    function saveSamples(samples) {
+      const seen = new Set();
+      const cleaned = [];
+      (samples || []).forEach(s => {
+        const key = (s.title || '').toLowerCase() + '|' + (s.label || '').toLowerCase();
+        if (!key.trim() || seen.has(key)) return;
+        seen.add(key);
+        cleaned.push({ title: s.title, label: s.label, source: s.source || 'page2' });
+      });
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(cleaned));
+    }
+    function mergeSamplesFromTable() {
+      const table = document.querySelector('tbody#data-body');
+      if (!table) return;
+      const rows = [...table.rows];
+      const tableSamples = rows.map(r => normalizeSample({
+        watched: r.cells[1]?.textContent || '',
+        category: r.cells[2]?.textContent || '',
+        source: 'page2'
+      }, 'page2')).filter(Boolean);
+      const existing = loadSamples().filter(s => s.source !== 'page2');
+      saveSamples(existing.concat(tableSamples));
+    }
+    function removeRow(btn) {
+      const row = btn.closest('tr');
+      row.classList.add('fade-out-row');
+      row.addEventListener('animationend', () => { row.remove(); mergeSamplesFromTable(); });
+    }
+    // Convert old "ratio" values to raw like counts on the fly (and leave weird values weird)
+    (function convertRatioToLikes(){
+      const table = document.querySelector('table');
+      if(!table || !table.tHead) return;
+      const headCells = table.tHead.rows[0].cells;
+      let idxLikeCol = -1, idxVues = -1;
+      for (let i=0;i<headCells.length;i++){
+        const t = headCells[i].textContent.trim().toLowerCase();
+        if (t === 'vues') idxVues = i;
+        if (t.includes("j'aime") || t.includes('ratio')) idxLikeCol = i;
+      }
+      if (idxLikeCol < 0 || idxVues < 0) return;
+      headCells[idxLikeCol].textContent = "J'aime";
+      const rows = [...table.tBodies[0].rows];
+      rows.forEach(r=>{
+        const vues = parseFloat(r.cells[idxVues].textContent.replace(/\s/g,'')) || 0;
+        const raw = r.cells[idxLikeCol].textContent.trim().replace(',', '.');
+        const ratio = parseFloat(raw);
+        if (!isNaN(ratio)) {
+          const likes = Math.round(vues * ratio);
+          // keep invalid results as-is (negative or > vues) so students can spot & clean them
+          r.cells[idxLikeCol].textContent = String(likes);
+        }
+      });
+    })();
+
+    // Sync initial table to shared storage (replaces older page2 entries but keeps others)
+    mergeSamplesFromTable();
+  </script>
+</body>
+</html>

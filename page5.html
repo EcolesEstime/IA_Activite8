@@ -1,0 +1,721 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ma bulle de recommandation</title>
+  <style>
+    body {
+      margin: 0; padding: 0; font-family: Verdana, sans-serif;
+      background: linear-gradient(to bottom, #5bc0eb, #20639b);
+      height: 100vh; overflow: hidden; position: relative;
+      display: flex; flex-direction: column;
+      opacity: 0; animation: fadeIn 0.5s ease forwards;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    @keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }
+    .fade-out { animation: fadeOut 0.5s ease forwards; }
+
+    h1 {
+      color: white;
+      text-align: center;
+      font-size: 2rem;
+      margin: 0.8rem auto 0.25rem;
+    }
+
+    .content {
+      flex: 1;
+      display: flex;
+      padding: 1rem;
+      box-sizing: border-box;
+      width: 100%;
+      justify-content: center;
+      align-items: stretch;
+      gap: 1rem;
+      height: calc(100vh - 150px);
+    }
+
+    .panel {
+      flex: 1 1 auto;
+      background: rgba(255,255,255,0.15);
+      border-radius: 12px;
+      padding: 1.25rem;
+      color: white;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.2);
+    }
+
+    .panel h2 { margin: 0 0 .75rem 0; font-size: 1.3rem; border-bottom: 1px solid rgba(255,255,255,0.3); padding-bottom: .35rem; }
+
+    #cy { width: 100%; height: 100%; min-height: 240px; background: #fff; border-radius: 10px; flex: 1 1 auto; }
+
+    .counter { margin-top: .5rem; font-size: .95rem; }
+    .counter-row { display: flex; gap: 1rem; align-items: center; }
+
+    /* Layout tuning so options are always visible */
+    .stats-panel { flex: 0 0 280px; }
+    .tree-panel { flex: 1 1 auto; display: grid; grid-template-rows: auto 1fr; gap: .75rem; }
+    .tree-layout { display: grid; grid-template-rows: minmax(260px, 1fr) minmax(220px, 1fr); gap: .75rem; height: 100%; min-height: 0; }
+    .tree-area { background: rgba(255,255,255,0.08); border-radius: 10px; padding: .5rem; display: flex; }
+    .options-wrap { display: grid; grid-template-rows: auto 1fr; gap: .5rem; min-height: 0; }
+
+    /* NEW: 4-card choice grid */
+    .options-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: .75rem; height: 100%; overflow: auto; padding-right: .25rem; }
+    .option-card { background: rgba(255,255,255,0.92); color:#222; border-radius: 10px; padding: .75rem; box-shadow: 0 2px 6px rgba(0,0,0,.15); cursor: pointer; user-select: none; }
+    .option-card h3 { margin: 0 0 .25rem 0; font-size: 1rem; line-height: 1.2; }
+    .option-card .tag { display:inline-block; font-size:.8rem; padding:2px 6px; border-radius:999px; background:#20639b; color:#fff; margin-bottom:.25rem; }
+    .option-meta { display:grid; grid-template-columns: 1fr auto; gap: 2px 8px; font-size:.85rem; }
+    .right { text-align:right; font-variant-numeric: tabular-nums; }
+    .option-card.selected { outline: 3px solid #20639b; }
+    .option-card.correct { outline: 3px solid #2ecc71; }
+    .option-card.incorrect { opacity: .65; }
+
+    /* Overlay for round reveal */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.65); backdrop-filter: blur(4px);
+      display: none; align-items: center; justify-content: center; z-index: 9999; }
+    .overlay.show { display: flex; }
+    .overlay-card { background: #fff; color: #222; border-radius: 12px; padding: 1.25rem 1.5rem;
+      min-width: 280px; max-width: 460px; box-shadow: 0 10px 30px rgba(0,0,0,0.35);
+      animation: popIn 0.4s ease; text-align: center; }
+    @keyframes popIn { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+    .overlay h3 { margin: 0 0 .5rem 0; font-size: 1.4rem; }
+    .overlay .duel { display: grid; grid-template-columns: 1fr auto 1fr; gap: .5rem; align-items: center; margin: .75rem 0; }
+    .overlay .duel .card { border: 2px solid #20639b; border-radius: 10px; padding: .5rem; }
+    .overlay .duel .card.win { background: #e5f7ed; border-color: #2ecc71; }
+    .overlay .duel .label { font-weight: 700; margin-top: .25rem; }
+    .overlay .vs { font-weight: 700; color: #20639b; }
+    .overlay .final-score { margin: .5rem 0; font-weight: 700; }
+    .overlay .final-winner { font-size: 1.1rem; margin: .25rem 0; }
+    .overlay button { margin-top: 1rem; background: #20639b; color: #fff; border: none; padding: .6rem 1.2rem;
+      border-radius: 6px; cursor: pointer; font-size: 1rem; }
+    .overlay button:hover { background: #164c76; }
+
+    .nav-bubble {
+      position: absolute; top: 1rem;
+      width: 30px; height: 30px;
+      background: rgba(255,255,255,0.2);
+      border-radius: 50%; display: flex;
+      align-items: center; justify-content: center;
+      cursor: pointer; backdrop-filter: blur(6px);
+      transition: background 0.2s;
+      z-index: 2; color: #fff; font-size: 1rem;
+    }
+    .nav-bubble:hover { background: rgba(255,255,255,0.3); }
+    .nav-left { right: 70px; }
+    .nav-right { right: 20px; }
+
+    .bubble-floating {
+      position: absolute; border-radius: 50%;
+      background: rgba(255,255,255,0.1);
+      animation: floatUp 30s linear infinite;
+      pointer-events: none; backdrop-filter: blur(8px);
+      z-index: -5;
+    }
+    @keyframes floatUp {
+      0% { bottom: -100px; transform: translateX(0); }
+      100% { bottom: 110%; transform: translateX(50px); }
+    }
+  </style>
+  <script src="https://unpkg.com/cytoscape@3.32.1/dist/cytoscape.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/lz-string@1.4.4/libs/lz-string.min.js"></script>
+</head>
+<body>
+  <div class="nav-bubble nav-left" onclick="navigate('page4.html')">◀</div>
+  <!-- Fin de l’activité -->
+  <div class="nav-bubble nav-right" onclick="navigate('index.html')">▶</div>
+  <h1 id="current-title"></h1>
+  <div class="content">
+    <div class="panel stats-panel">
+      <h2>Modèle Entraîné</h2>
+      <div id="model-pred">Le robot a choisi : <em>(aucune)</em></div>
+      <div class="counter">✅: <span id="model-correct">0</span></div>
+    </div>
+    <div class="panel tree-panel">
+      <h2>Arbre de Décision</h2>
+      <div class="tree-layout">
+        <div class="tree-area">
+          <div id="cy"></div>
+        </div>
+        <div class="options-wrap">
+          <div class="counter-row">
+            <div class="counter">✅: <span id="user-correct">0</span></div>
+          </div>
+          <!-- NEW: four datapoints to choose from -->
+          <div id="option-grid" class="options-grid"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="bubble-floating" style="left:10%;width:80px;height:80px;animation-delay:1s"></div>
+  <div class="bubble-floating" style="left:30%;width:60px;height:60px;animation-delay:5s;"></div>
+  <div class="bubble-floating" style="left:50%;width:100px;height:100px;animation-delay:3s"></div>
+  <div class="bubble-floating" style="left:70%;width:50px;height:50px;animation-delay:7s"></div>
+  <div class="bubble-floating" style="left:90%;width:80px;height:80px;animation-delay:4s"></div>
+  <div id="result-overlay" class="overlay">
+    <div class="overlay-card">
+      <h3 id="overlay-title">Résultat</h3>
+      <div id="overlay-body"></div>
+      <button id="overlay-next">Continuer</button>
+    </div>
+  </div>
+
+<script>
+const LOG = (...args) => { try { console.log('[page5]', ...args); } catch (_) {} };
+function navigate(url){
+  LOG('navigate', url);
+  document.body.classList.add('fade-out');
+  document.body.addEventListener('animationend',()=>location.href=url,{once:true});
+}
+
+// --- Shared data/model utilities ---
+const STORAGE_KEY = 'studentDataV2';
+const GRAPH_KEY = 'graphSessionV1';
+let isRestoring = false;
+let cy; // set on DOMContentLoaded
+
+const BASE_SAMPLES = [
+{title:'Aventure au chalet des amis',label:'Dessins'},
+{title:'Moments drôles du castor bleu',label:'Dessins'},
+{title:'La course folle du lapin malin',label:'Dessins'},
+{title:'La flaque de boue magique',label:'Dessins'},
+{title:'Le coureur et le coyote rigolo',label:'Dessins'},
+{title:'Blagues du duo farceur',label:'Dessins'},
+{title:'Sauvetage dans la forêt mystique',label:'Dessins'},
+{title:'Patrouille du port joyeux',label:'Dessins'},
+{title:'Fête de danse des chiots',label:'Dessins'},
+{title:'La montagne russe bricolée',label:'Dessins'},
+{title:'Le village en carton prend vie',label:'Dessins'},
+{title:'Le dragon qui éternue des confettis',label:'Dessins'},
+{title:'La fusée dessinée décolle pour de vrai',label:'Dessins'},
+{title:'Le carnaval des parapluies volants',label:'Dessins'},
+{title:'La carte au trésor de la cour d’école',label:'Dessins'},
+{title:'Le train fantôme mais gentil',label:'Dessins'},
+{title:'Le concours de grimaces intergalactique',label:'Dessins'},
+{title:'Le cirque des objets perdus',label:'Dessins'},
+{title:'Le pâtissier pingouin et ses gâteaux',label:'Dessins'},
+{title:'La cabane secrète au sommet du nuage',label:'Dessins'},
+
+{title:'Volcan maison avec vinaigre',label:'Expériences'},
+{title:'Fusée au bicarbonate de soude',label:'Expériences'},
+{title:'Réaction pâte à dents géante',label:'Expériences'},
+{title:'Fabriquer du slime étirable',label:'Expériences'},
+{title:'Lait qui change de couleur',label:'Expériences'},
+{title:'Oobleck étrange liquide-solide',label:'Expériences'},
+{title:'Voiture ballon propulsée',label:'Expériences'},
+{title:'Lampe lave DIY',label:'Expériences'},
+{title:'Pile citron maison',label:'Expériences'},
+{title:'Fontaine menthe et cola',label:'Expériences'},
+{title:'Arc-en-ciel en bocal',label:'Expériences'},
+{title:'Encre invisible au jus de citron',label:'Expériences'},
+{title:'Pont en spaghetti qui tient',label:'Expériences'},
+{title:'Bateau en aluminium qui ne coule pas',label:'Expériences'},
+{title:'Aimants et boussole maison',label:'Expériences'},
+{title:'Pluie en nuage de mousse à raser',label:'Expériences'},
+{title:'Paper rocket qui vole droit',label:'Expériences'},
+{title:'Œuf rebondissant sans coquille',label:'Expériences'},
+{title:'Cristaux de sel en 24 heures',label:'Expériences'},
+{title:'Tornade dans une bouteille',label:'Expériences'},
+
+{title:'Premiers pas du panda roux',label:'Animaux'},
+{title:'Safari rugissements du lion',label:'Animaux'},
+{title:'Chiens exécutent des tours',label:'Animaux'},
+{title:'Chatons jouent au laser',label:'Animaux'},
+{title:'Sauts spectaculaires des dauphins',label:'Animaux'},
+{title:'Danse des oiseaux tropicaux',label:'Animaux'},
+{title:'Vie secrète des fourmis',label:'Animaux'},
+{title:'Sauvetage d’un manchot',label:'Animaux'},
+{title:'Bain de boue de l’éléphant',label:'Animaux'},
+{title:'Grimpe du panda roux',label:'Animaux'},
+{title:'Comment brosser son chat sans stress',label:'Animaux'},
+{title:'Mon chien teste un parcours d’agilité',label:'Animaux'},
+{title:'Au refuge: histoires de chiens seniors',label:'Animaux'},
+{title:'Chevaux miniatures en promenade',label:'Animaux'},
+{title:'Caméra nichoir: naissance des mésanges',label:'Animaux'},
+{title:'Renard curieux près du chalet',label:'Animaux'},
+{title:'Grenouilles et têtards à l’étang',label:'Animaux'},
+{title:'Tortues marines libérées sur la plage',label:'Animaux'},
+{title:'Au bain: capybaras relax',label:'Animaux'},
+{title:'Guide des soins pour hamster débutant',label:'Animaux'},
+
+{title:'Le système solaire expliqué',label:'Sciences'},
+{title:'Pourquoi les plantes sont vertes',label:'Sciences'},
+{title:'Physique des montagnes russes',label:'Sciences'},
+{title:'Voyage dans le corps humain',label:'Sciences'},
+{title:'Construire un circuit simple',label:'Sciences'},
+{title:'Cycle de l’eau illustré',label:'Sciences'},
+{title:'Bases du magnétisme',label:'Sciences'},
+{title:'Les états de la matière',label:'Sciences'},
+{title:'Documentaire sur les dinosaures',label:'Sciences'},
+{title:'Introduction à l’électricité',label:'Sciences'},
+{title:'Pourquoi avons-nous des saisons',label:'Sciences'},
+{title:'Énergie renouvelable à la maison',label:'Sciences'},
+{title:'Comment les avions volent',label:'Sciences'},
+{title:'La force de gravité en exemples',label:'Sciences'},
+{title:'Microbes bons et mauvais',label:'Sciences'},
+{title:'Lumière et prisme arc-en-ciel',label:'Sciences'},
+{title:'Anatomie du cerveau simplifiée',label:'Sciences'},
+{title:'Tectonique des plaques animée',label:'Sciences'},
+{title:'Pourquoi le ciel est bleu',label:'Sciences'},
+{title:'Mesurer le temps sans montre',label:'Sciences'},
+
+{title:'Construction d’un monde en blocs',label:'Jeux vidéo'},
+{title:'Match de soccer virtuel',label:'Jeux vidéo'},
+{title:'Aventure RPG forêt enchantée',label:'Jeux vidéo'},
+{title:'Stratégie conquête médiévale',label:'Jeux vidéo'},
+{title:'Puzzle plateforme spatiale',label:'Jeux vidéo'},
+{title:'Course à obstacles néon',label:'Jeux vidéo'},
+{title:'Simulation ferme canadienne',label:'Jeux vidéo'},
+{title:'Course folle de kart arctique',label:'Jeux vidéo'},
+{title:'Défi danse rythmique arcade',label:'Jeux vidéo'},
+{title:'Guide débutant de l’île pixel',label:'Jeux vidéo'},
+{title:'Survie extrême : ma base secrète révélée',label:'Jeux vidéo'},
+{title:'Top 5 des meilleurs RPG fantastiques',label:'Jeux vidéo'},
+{title:'Jeu d’énigmes: salle secrète',label:'Jeux vidéo'},
+{title:'Boss final battu sans dégâts',label:'Jeux vidéo'},
+{title:'Construire une ferme automatique',label:'Jeux vidéo'},
+{title:'Vitesse: record sur piste urbaine',label:'Jeux vidéo'},
+{title:'Mode créatif: maison moderne',label:'Jeux vidéo'},
+{title:'Tournoi local: finale épique',label:'Jeux vidéo'},
+{title:'Astuces pour débuter en sandbox',label:'Jeux vidéo'},
+{title:'Exploration d’un donjon gelé',label:'Jeux vidéo'}
+];
+
+const FIXED_REC_VID = {
+  Dessins:'Aventure au chalet des amis',
+  "Expériences":'Réaction pâte à dents géante',
+  Animaux:'Premiers pas du panda roux',
+  Sciences:'Le système solaire expliqué',
+  "Jeux vidéo":'Construction d’un monde en blocs'
+};
+
+function cleanElement(ele) {
+  if (!ele || !ele.group || !ele.data) return null;
+  const base = { group: ele.group, data: { ...ele.data } };
+  const cls = ele.classes || ele.data.classes;
+  if (cls && String(cls).trim()) {
+    base.classes = Array.isArray(cls) ? cls.join(' ') : String(cls);
+  }
+  if (ele.group === 'nodes') {
+    const pos = ele.position;
+    if (pos && Number.isFinite(pos.x) && Number.isFinite(pos.y)) {
+      base.position = { x: Number(pos.x), y: Number(pos.y) };
+    }
+  }
+  return base;
+}
+
+function normalizeSnapshotShape(raw) {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (raw.nodes || raw.edges) return [...(raw.nodes || []), ...(raw.edges || [])];
+  return [];
+}
+
+function readSnapshot() {
+  const raw = sessionStorage.getItem(GRAPH_KEY);
+  LOG('readSnapshot raw exists', !!raw);
+  if (!raw) return [];
+
+  const parse = txt => normalizeSnapshotShape(JSON.parse(txt));
+
+  try {
+    const parsed = parse(raw);
+    if (parsed.length) return parsed;
+  } catch (e) { LOG('readSnapshot json fail', e); }
+
+  try {
+    const txt = LZString.decompressFromEncodedURIComponent(raw);
+    if (txt) {
+      const parsed = parse(txt);
+      if (parsed.length) return parsed;
+    }
+  } catch (e) { LOG('readSnapshot lz fail', e); }
+
+  return [];
+}
+
+function prepareElements(list) {
+  const cleaned = list.map(cleanElement).filter(Boolean);
+  const nodes = [];
+  const edges = [];
+  const nodeIds = new Set();
+
+  // Simple grid fallback
+  let col = 0, row = 0;
+  const stepX = 240, stepY = 140, startX = 140, startY = 160, maxCols = 3;
+
+  cleaned.forEach(ele => {
+    if (ele.group !== 'nodes') return;
+    const id = String(ele.data.id || ele.data.name || 'n' + nodes.length);
+    if (nodeIds.has(id)) return;
+    const node = { ...ele, data: { ...ele.data, id } };
+    if (!node.position) {
+      node.position = { x: startX + col * stepX, y: startY + row * stepY };
+      col = (col + 1) % maxCols;
+      if (col === 0) row++;
+    }
+    nodeIds.add(id);
+    nodes.push(node);
+  });
+
+  cleaned.forEach(ele => {
+    if (ele.group !== 'edges') return;
+    const src = ele.data.source, tgt = ele.data.target;
+    if (!src || !tgt) return;
+    const source = String(src), target = String(tgt);
+    if (!nodeIds.has(source) || !nodeIds.has(target)) return;
+    const id = ele.data.id ? String(ele.data.id) : 'e' + edges.length;
+    edges.push({ ...ele, data: { ...ele.data, id, source, target } });
+  });
+
+  return { nodes, edges };
+}
+
+function saveState() {
+  if (isRestoring || !cy) return;
+  const snapshot = cy.elements().jsons().map(cleanElement).filter(Boolean);
+  try {
+    sessionStorage.setItem(GRAPH_KEY, JSON.stringify(snapshot));
+  } catch (e) {
+    console.warn('saveState failed', e);
+  }
+  LOG('saveState', { nodes: cy.nodes().length, edges: cy.edges().length });
+}
+
+function restoreGraphFromSnapshot(snapshotList) {
+  const { nodes, edges } = prepareElements(Array.isArray(snapshotList) ? snapshotList : readSnapshot());
+  LOG('restoreGraphFromSnapshot prepared', { nodes: nodes.length, edges: edges.length });
+
+  isRestoring = true;
+  cy.elements().remove();
+  if (nodes.length) cy.add(nodes);
+
+  const finalize = () => {
+    requestAnimationFrame(() => {
+      cy.resize();
+      if (cy.elements().length) cy.fit(null, 60);
+      isRestoring = false;
+      saveState(); // persist normalized snapshot
+    });
+  };
+
+  if (!edges.length) {
+    finalize();
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    cy.add(edges);
+    finalize();
+  });
+}
+
+function normalizeSample(s){
+  if(!s) return null;
+  const title=(s.title||s.watched||'').trim();
+  const label=(s.label||s.category||'').trim();
+  if(!title||!label) return null;
+  return {title,label,source:s.source||'unknown'};
+}
+function loadSamples(){
+  try{
+    const raw=JSON.parse(localStorage.getItem(STORAGE_KEY)||'[]');
+    const stored=Array.isArray(raw)?raw.map(normalizeSample).filter(Boolean):[];
+    return dedupeSamples(BASE_SAMPLES.concat(stored));
+  }catch(e){
+    return BASE_SAMPLES;
+  }
+}
+function dedupeSamples(arr){
+  const seen=new Set(); const out=[];
+  (arr||[]).forEach(s=>{
+    if(!s) return;
+    const key=s.title.toLowerCase()+'|'+s.label.toLowerCase();
+    if(seen.has(key)) return;
+    seen.add(key);
+    out.push({title:s.title,label:s.label,source:s.source||'unknown'});
+  });
+  return out;
+}
+
+function trainNaiveBayes(samples){
+  const vocab=new Map();
+  const labelCounts={}, wordCounts={}, totalWords={};
+  samples.forEach(s=>{
+    const tokensArr=tokens(s.title);
+    labelCounts[s.label]=(labelCounts[s.label]||0)+1;
+    wordCounts[s.label]=wordCounts[s.label]||{};
+    totalWords[s.label]=totalWords[s.label]||0;
+    tokensArr.forEach(w=>{
+      vocab.set(w,(vocab.get(w)||0)+1);
+      wordCounts[s.label][w]=(wordCounts[s.label][w]||0)+1;
+      totalWords[s.label]++;
+    });
+  });
+  const labels=Object.keys(labelCounts);
+  const vocabSize=vocab.size||1;
+  const logPrior={}; const logLik={}; const unk={};
+  labels.forEach(l=>{
+    logPrior[l]=Math.log((labelCounts[l]||1)/samples.length);
+    logLik[l]={};
+    const denom=(totalWords[l]||0)+vocabSize;
+    unk[l]=Math.log(1/denom);
+    vocab.forEach((_,w)=>{
+      const num=(wordCounts[l][w]||0)+1;
+      logLik[l][w]=Math.log(num/denom);
+    });
+  });
+  return {labels,logPrior,logLik,unk,vocab:Array.from(vocab.keys())};
+}
+function predictWithModel(text,model){
+  if(!model||!model.labels.length) return null;
+  const toks=tokens(text);
+  let best=null,bestScore=-Infinity;
+  model.labels.forEach(l=>{
+    let s=model.logPrior[l];
+    toks.forEach(w=>{
+      s+= (model.logLik[l][w]!==undefined?model.logLik[l][w]:model.unk[l]);
+    });
+    if(s>bestScore){bestScore=s;best=l;}
+  });
+  return best;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  cy = cytoscape({
+    container: document.getElementById('cy'),
+    elements: [],
+    style: [
+      { selector: 'node', style: {
+          'label':'data(label)',
+          'text-valign':'center','text-halign':'center',
+          'color':'#fff','width':'label','height':50,
+          'background-color':'#666'
+        }
+      },
+      { selector: '.decision', style: {
+          'shape':'diamond','background-color':'#4CAF50','padding':'30px'
+        }
+      },
+      { selector: '.leaf', style: {
+          'shape':'roundrectangle','background-color':'#2196F3','padding':'10px'
+        }
+      },
+      { selector: 'edge', style: {
+          'width':2,'line-color':'#000',
+          'target-arrow-shape':'triangle','target-arrow-color':'#000',
+          'arrow-scale':1.2,'curve-style':'bezier',
+          'label':'data(label)',
+          'text-background-opacity':1,'text-background-color':'#fff',
+          'text-background-shape':'roundrectangle','text-background-padding':2,
+          'font-size':12,'text-rotation':'autorotate'
+        }
+      }
+    ],
+    layout:{ name:'preset' }
+  });
+
+  const cyEl = document.getElementById('cy');
+
+  if (window.ResizeObserver) {
+    new ResizeObserver(() => { cy.resize(); }).observe(cyEl);
+  }
+  window.addEventListener('resize', () => { cy.resize(); });
+
+  const initialSnapshot = readSnapshot();
+  LOG('initial snapshot', { count: initialSnapshot.length, sample: initialSnapshot.slice(0,3) });
+  if (initialSnapshot.length) restoreGraphFromSnapshot(initialSnapshot);
+  else saveState();
+
+  cy.on('add remove data position', saveState);
+
+  window.cy = cy;
+});
+
+function tokens(s){return s.toLowerCase().split(/[^a-zàâçéèêëîïôûùüÿñæœ0-9]+/).filter(Boolean)}
+const defaultTestData=[
+{title:'Bataille de robots rétro',label:'Jeux vidéo'},
+{title:'Expérience œuf rebondissant',label:'Expériences'},
+{title:'Pourquoi avons-nous des saisons',label:'Sciences'},
+{title:'Premiers pas du koala',label:'Animaux'},
+{title:'Le train fantôme mais gentil',label:'Dessins'},
+{title:'Cristaux de sel en 24 heures',label:'Expériences'},
+{title:'Top 5 des meilleurs RPG fantastiques',label:'Jeux vidéo'},
+{title:'La carte au trésor de la cour d’école',label:'Dessins'},
+{title:'Comment les avions volent',label:'Sciences'},
+{title:'Guide des soins pour hamster débutant',label:'Animaux'}
+];
+
+function buildRecVideos(samples){
+  const out={...FIXED_REC_VID};
+  samples.forEach(s=>{ if(!out[s.label]) out[s.label]=s.title; });
+  return out;
+}
+function buildLabelTitlePool(samples){
+  const pool={};
+  samples.forEach(s=>{
+    if(!s || !s.label || !s.title) return;
+    const lbl=s.label;
+    if(!pool[lbl]) pool[lbl]=[];
+    pool[lbl].push(s.title);
+  });
+  return pool;
+}
+function pickTitleFor(label, pool){
+  const list=(pool[label]||[]).filter(Boolean);
+  if(list.length){
+    return list[Math.floor(Math.random()*list.length)];
+  }
+  return FIXED_REC_VID[label] || label || '(aucune)';
+}
+function buildTestData(samples){
+  if(samples.length) return samples.slice(0, Math.min(samples.length, 12));
+  return defaultTestData;
+}
+
+let allSamples = loadSamples();
+let recVid = buildRecVideos(allSamples);
+let labelTitlePool = buildLabelTitlePool(allSamples);
+let model = trainNaiveBayes(allSamples);
+let testData = buildTestData(allSamples);
+let categories = Object.keys(recVid);
+let currentRoundModelCat = null;
+let roundFinished = false;
+let currentCorrectCat = null;
+let currentRoundTitles = {};
+
+let modelCorrect=0,userCorrect=0,currentTest=0;
+
+function initAndStart(){showTest()}
+if(document.readyState==='loading'){document.addEventListener('DOMContentLoaded',initAndStart)}else{initAndStart()}
+
+function showTest(){
+  if(currentTest>=testData.length){
+    document.getElementById('current-title').textContent='Fin des tests';
+    document.getElementById('model-pred').textContent='Terminé';
+    return;
+  }
+  const t=testData[currentTest];
+  currentCorrectCat = t.label;
+  document.getElementById('current-title').textContent=`Visionné : ${t.title}`;
+  const predicted = predictWithModel(t.title, model) || categories[0];
+  // 25% chance the robot intentionally loses (pick a wrong category if possible)
+  if (Math.random() < 0.25 && categories.length > 1) {
+    const alt = categories.filter(c => c !== currentCorrectCat);
+    currentRoundModelCat = alt.length ? alt[Math.floor(Math.random()*alt.length)] : predicted;
+  } else {
+    currentRoundModelCat = predicted;
+  }
+  document.getElementById('model-pred').innerHTML=`Le robot a choisi... <em>(secret)</em>`;
+  roundFinished = false;
+  renderOptions(currentRoundModelCat);
+}
+
+function fmt(n){try{return Number(n).toLocaleString('fr-CA')}catch(e){return String(n)}}
+function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a}
+function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
+
+let currentOptions=[];
+
+function renderOptions(robotCat){
+  currentRoundTitles = {};
+  const t=testData[currentTest];
+  const correctCat=t.label;
+  const cats=categories;
+  const optionCats=[correctCat];
+  if(robotCat!==correctCat)optionCats.push(robotCat);
+  const remaining=cats.filter(c=>!optionCats.includes(c));
+  shuffle(remaining);
+  while(optionCats.length<4&&remaining.length)optionCats.push(remaining.shift());
+  shuffle(optionCats);
+  const grid=document.getElementById('option-grid');
+  grid.innerHTML='';currentOptions=[];
+  optionCats.forEach(cat=>{
+    const vidTitle = pickTitleFor(cat, labelTitlePool);
+    currentRoundTitles[cat] = vidTitle;
+    const card=document.createElement('div');
+    card.className='option-card';
+    card.innerHTML=`<h3>${vidTitle}</h3><div class="tag">${cat}</div>`;
+    card.addEventListener('click',()=>choose(cat,card));
+    grid.appendChild(card);
+    currentOptions.push({cat,el:card});
+  });
+}
+
+function choose(cat){
+  if(currentTest>=testData.length || roundFinished)return;
+  roundFinished = true;
+  const t=testData[currentTest];
+  const correctCat=currentCorrectCat;
+  currentOptions.forEach(o=>{o.el.classList.add(o.cat===correctCat?'correct':'incorrect')});
+  const userOk = cat===correctCat;
+  if(userOk){userCorrect++;document.getElementById('user-correct').textContent=userCorrect}
+  showRoundResult({
+    userCat: cat,
+    modelCat: currentRoundModelCat,
+    correctCat,
+    title: t.title,
+    isLast: currentTest === testData.length - 1
+  });
+}
+
+function showRoundResult({userCat, modelCat, correctCat, title, isLast}){
+  const overlay = document.getElementById('result-overlay');
+  const oTitle = document.getElementById('overlay-title');
+  const oBody = document.getElementById('overlay-body');
+  const oBtn = document.getElementById('overlay-next');
+
+  const modelOk = modelCat === correctCat;
+  if (modelOk) {
+    modelCorrect++;
+    document.getElementById('model-correct').textContent = modelCorrect;
+  }
+  const modelVid = currentRoundTitles[modelCat] || pickTitleFor(modelCat, labelTitlePool);
+  document.getElementById('model-pred').innerHTML=`Le robot a choisi : <strong>${modelVid}</strong>`;
+
+  const userOk = userCat === correctCat;
+  const winner = userOk && modelOk ? 'Égalité' : userOk ? 'Bravo, tu gagnes !' : modelOk ? 'Le robot gagne !' : 'Personne ne trouve !';
+  const userVid = currentRoundTitles[userCat] || pickTitleFor(userCat, labelTitlePool);
+  const correctVid = currentRoundTitles[correctCat] || pickTitleFor(correctCat, labelTitlePool);
+
+  const duel = `
+    <div class="duel">
+      <div class="card ${userOk?'win':''}"><div>Toi</div><div class="label">${userVid||'?'}</div></div>
+      <div class="vs">vs</div>
+      <div class="card ${modelOk?'win':''}"><div>Robot</div><div class="label">${modelVid||'?'}</div></div>
+    </div>
+  `;
+
+  const baseBody = `<p>Vidéo vue : <strong>${title}</strong></p>${duel}<p>Vidéo correcte : <strong>${correctVid}</strong></p>`;
+
+  if (isLast) {
+    const examples = testData.slice(0,3).map(e=>`<li>${e.title}</li>`).join('');
+    const finalWinner = userCorrect>modelCorrect ? 'Tu remportes la partie !' :
+                       modelCorrect>userCorrect ? 'Le robot l’emporte !' :
+                       'Match nul !';
+    oTitle.textContent = 'Grand dévoilement';
+    oBody.innerHTML = `${baseBody}<p class="final-score">Score final — Toi: ${userCorrect} · Robot: ${modelCorrect}</p><p class="final-winner">${finalWinner}</p><p>Exemples testés :</p><ul>${examples}</ul>`;
+    oBtn.textContent = 'Terminer';
+    oBtn.onclick = () => {
+      overlay.classList.remove('show');
+      document.getElementById('current-title').textContent='Fin des tests';
+      document.getElementById('model-pred').textContent='Terminé';
+    };
+  } else {
+    oTitle.textContent = winner;
+    oBody.innerHTML = baseBody;
+    oBtn.textContent = 'Prochaine vidéo';
+    oBtn.onclick = () => {
+      overlay.classList.remove('show');
+      currentTest++;
+      showTest();
+    };
+  }
+  overlay.classList.add('show');
+}
+</script>
+
+</body>
+</html>
