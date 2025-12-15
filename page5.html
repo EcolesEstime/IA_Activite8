@@ -618,6 +618,13 @@ function rand(a,b){return Math.floor(Math.random()*(b-a+1))+a}
 function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
 
 let currentOptions=[];
+function generateFeatures(){
+  const vues=rand(1_000,500_000);
+  const likes=Math.max(0,Math.round(vues*(0.05+Math.random()*0.2)));
+  const comments=Math.max(0,Math.round(likes*(0.02+Math.random()*0.2)));
+  const days=rand(0,365);
+  return{vues,likes,comments,days};
+}
 
 function renderOptions(robotCat){
   currentRoundTitles = {};
@@ -635,9 +642,10 @@ function renderOptions(robotCat){
   optionCats.forEach(cat=>{
     const vidTitle = pickTitleFor(cat, labelTitlePool);
     currentRoundTitles[cat] = vidTitle;
+    const f = generateFeatures();
     const card=document.createElement('div');
     card.className='option-card';
-    card.innerHTML=`<h3>${vidTitle}</h3><div class="tag">${cat}</div>`;
+    card.innerHTML=`<h3>${vidTitle}</h3><div class="tag">${cat}</div><div class="option-meta"><div>Vues</div><div class="right">${fmt(f.vues)}</div><div>J'aime</div><div class="right">${fmt(f.likes)}</div><div>Commentaires</div><div class="right">${fmt(f.comments)}</div><div>Publiée il y a</div><div class="right">${f.days} j</div></div>`;
     card.addEventListener('click',()=>choose(cat,card));
     grid.appendChild(card);
     currentOptions.push({cat,el:card});
@@ -676,7 +684,7 @@ function showRoundResult({userCat, modelCat, correctCat, title, isLast}){
   document.getElementById('model-pred').innerHTML=`Le robot a choisi : <strong>${modelVid}</strong>`;
 
   const userOk = userCat === correctCat;
-  const winner = userOk && modelOk ? 'Égalité' : userOk ? 'Bravo, tu gagnes !' : modelOk ? 'Le robot gagne !' : 'Personne ne trouve !';
+  const winner = userOk && modelOk ? 'Égalité' : userOk ? 'Bravo, tu as bien choisi!' : modelOk ? 'Le robot a bien choisi' : 'Personne n\'a bien choisi';
   const userVid = currentRoundTitles[userCat] || pickTitleFor(userCat, labelTitlePool);
   const correctVid = currentRoundTitles[correctCat] || pickTitleFor(correctCat, labelTitlePool);
 
