@@ -250,7 +250,8 @@ document.getElementById('trainBtn').addEventListener('click',()=>{
     let res='<h3>Résultats</h3>';
     res+=`<p>${samples.length} échantillons (page 1 + page 2 + base), précision entraînement: <strong>${acc}%</strong></p>`;
     res+='<table><tr><th>Titre</th><th>Vérité</th><th>Prédiction</th></tr>';
-    samples.slice(0,12).forEach(s=>{
+    const shuffled = samples.sort(() => 0.5 - Math.random());
+    shuffled.slice(0,12).forEach(s=>{
       const pred=predictWithModel(s.title,model);
       const ok=pred===s.label?'✅':'❌';
       res+=`<tr><td>${s.title}</td><td>${s.label}</td><td>${pred||'?'} ${ok}</td></tr>`;
